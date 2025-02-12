@@ -33,7 +33,9 @@ let CONFIG = {
   // LVDS recovery voltage threshold
   lvdsRecoveryVoltage: 48.3,
   // polling interval in seconds
-  pollingIntervalSeconds: 20.
+  pollingIntervalSeconds: 20,
+  // timeout for http call
+  httpTimeout: 10,
 };
 
 
@@ -41,31 +43,65 @@ let CONFIG = {
 // this is our polling timer
 let pollTimer = null;
 
+// generic function that reads a parameter with http get.
+// p_url: address of device to read
+function fn_shelly_call(p_url) {
+  Shelly.call(
+    "http.get",
+    { url: p_url, timeout: CONFIG.httpTimeout },
+    function (response, error_code, error_message) {
+      if (error_code != 0) {
+        print("Failed to fetch, error(" + error_code + ") " + error_message + ' - url: ' + p_url);
+        return 0;
+      } else {
+        if (response === undefined) {
+          print("ERROR - response undefined");
+          return 0;
+        } else {
+            let responseData = JSON.parse(response.body);
+            print("response raw: ", response);
+            return responseData;
+        }
+      }
+    }
+  );   
+}
+
 // This function gets the battery voltage from local status
 function get_battery_voltage() {
-  const response = Shelly.getComponentStatus('voltmeter')
+  const p_url = "http://192.168.87.130/rpc/Voltmeter.GetStatus?id=100";
 
-  const responseValid = typeof response !== "undefined" && hasProperty(response, 'xvoltage');
-
-  // if the response has errors that contains 'read' it means that voltage is >= 50V
-  if (responseValid === false) {
+  let responseObject = fn_shelly_call(p_url);
+  if (responseObject === 0) {
     return;
   }
-  else {
-  
-  let batteryVoltageRaw = response.xvoltage;
-  }
 
-  console.log(Date.now(), 'Raw Battery Voltage:', batteryVoltageRaw);
+  print("Voltmeter object: ", JSON.stringify(responseObject));
+  
 }
 
 print(Date.now(), "Start Battery Voltage monitoring for LVDS ");
 
+pingTimer = Timer.set(CONFIG.pollingIntervalSeconds * 1000, true, get_battery_voltage);
 
 Shelly.addStatusHandler(function (status) {
-  //check if the event source is a voltmeter
-  //and if the id of the input is 100
-  if (status.name === "voltmeter" && status.id === 100) {
-    print("Raw battery voltage = ", status.delta.xvoltage);
-  }
+  //is the component a switch
+  if(status.name !== "switch") return;
+
+  //is it the one with id 0
+  if(status.id !== 0) return;
+
+  //does it have a delta.source property
+  if(typeof status.delta.source === "undefined") return;
+
+  //is the source a timer
+  if(status.delta.source !== "timer") return;
+
+  //is it turned on
+  if(status.delta.output !== true) return;
+
+  Timer.clear(pingTimer);
+
+  // start the loop to ping the endpoints again
+  pingTimer = Timer.set(CONFIG.retryIntervalSeconds * 1000, true, get_battery_voltage);
 });
