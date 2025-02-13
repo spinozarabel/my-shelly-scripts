@@ -41,7 +41,7 @@ let CONFIG = {
 // this is our polling timer
 let pollTimer = null;
 
-// This function gets the battery voltage from local status
+// This function gets the battery voltage from local status ---------------
 function get_battery_voltage() {
   const response = Shelly.getComponentStatus('voltmeter')
 
@@ -58,14 +58,19 @@ function get_battery_voltage() {
 
   console.log(Date.now(), 'Raw Battery Voltage:', batteryVoltageRaw);
 }
+// ------------------------------------------------------------------------
 
 print(Date.now(), "Start Battery Voltage monitoring for LVDS ");
 
 
 Shelly.addStatusHandler(function (status) {
   //check if the event source is a voltmeter
-  //and if the id of the input is 100
-  if (status.name === "voltmeter" && status.id === 100) {
-    print("Raw battery voltage = ", status.delta.xvoltage);
+  //and if the id is 100. That will be our voltmeter:100
+  //
+  if ( status.id === 100) {
+
+    if ( status.xvoltage !== undefined  ) {
+      print("Raw battery voltage = ", status.xvoltage);
+    }
   }
 });
