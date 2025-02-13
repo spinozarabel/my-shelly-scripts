@@ -67,14 +67,10 @@ Shelly.addStatusHandler(function (status) {
   //check if the event source is a voltmeter
   //and if the id is 100. That will be our voltmeter:100
   //
-  if (status.name === "voltmeter" && status.id === 100) {
+  if ( status.id === 100) {
 
-    // This is of interest to us. Lets check if there are any errors
-    if (status.errors.length > 0) {
-      print("Raw battery voltage = ", batteryVoltageRaw);
-    }
-    else {
-      // there are errors so it will return anyway
+    if ( status.xvoltage !== undefined  ) {
+      print("Raw battery voltage = ", status.xvoltage);
     }
   }
 });
