@@ -68,12 +68,13 @@ Shelly.addStatusHandler(function (status) {
   //and if the id is 100. That will be our voltmeter:100
   //
   if (status.name === "voltmeter" && status.id === 100) {
-    let batteryVoltageRaw = status.delta.xvoltage;
 
-    if (batteryVoltageRaw === null || batteryVoltageRaw === undefined) {
-      return;
+    // This is of interest to us. Lets check if there are any errors
+    if (status.errors.length > 0) {
+      print("Raw battery voltage = ", batteryVoltageRaw);
     }
-
-    print("Raw battery voltage = ", batteryVoltageRaw);
+    else {
+      // there are errors so it will return anyway
+    }
   }
 });
