@@ -42,25 +42,16 @@ let CONFIG = {
 let pollTimer = null;
 
 // This function gets the battery voltage from local status ---------------
-function get_battery_voltage() {
-  const response = Shelly.getComponentStatus('voltmeter')
+function processMainFunction(status) {
 
-  const responseValid = typeof response !== "undefined" && hasProperty(response, 'xvoltage');
+  // uncompensated raw battery voltage as measured at battery terminals
+  const batteryVoltageRaw = status.xvoltage
 
-  // if the response has errors that contains 'read' it means that voltage is >= 50V
-  if (responseValid === false) {
-    return;
-  }
-  else {
-  
-  let batteryVoltageRaw = response.xvoltage;
-  }
-
-  console.log(Date.now(), 'Raw Battery Voltage:', batteryVoltageRaw);
+  console.log('Raw Battery Voltage:', batteryVoltageRaw);
 }
 // ------------------------------------------------------------------------
 
-print(Date.now(), "Start Battery Voltage monitoring for LVDS ");
+
 
 
 Shelly.addStatusHandler(function (status) {
@@ -70,7 +61,7 @@ Shelly.addStatusHandler(function (status) {
   if ( status.id === 100) {
 
     if ( status.xvoltage !== undefined  ) {
-      print("Raw battery voltage = ", status.xvoltage);
+      processMainFunction(status);
     }
   }
 });
