@@ -54,35 +54,51 @@ function fn_shelly_call(p_url) {
         print("Failed to fetch, error(" + error_code + ") " + error_message + ' - url: ' + p_url);
         return 0;
       } else {
-        if (response === undefined) {
-          print("ERROR - response undefined");
+        if (response === undefined || response === null) {
+          print("ERROR - response undefined or NULL");
           return 0;
         } else {
             let responseData = JSON.parse(response.body);
-            print("response raw: ", response);
-            return responseData;
+            let batterVoltageRaw = responseData.xvoltage;
+            if (batterVoltageRaw == undefined || batterVoltageRaw === null)  {
+              print("ERROR - response error code: " + responseData.error);
+              return;
+            }
+            // we have a valid measurement of the raw battery voltage at its terminals
+            print (Date.now(), "Raw Battery Voltage: ", batterVoltageRaw);
+
+            Shelly.call("Input.GetStatus",{ id:100 },
+              function(result, err_code, err_message, batterVoltageRaw) {
+                  if (err_code === 0) {
+                    const battery_current = result['xpercent'];
+                      console.log("battery current", battery_current);
+                      
+                  } else {
+                      console.log("Error:", err_message);
+                  }
+              }
+          );
+
+            
+            }
         }
-      }
-    }
-  );   
+  });
 }
+    
 
-// This function gets the battery voltage from local status
-function get_battery_voltage() {
-  const p_url = "http://192.168.87.130/rpc/Voltmeter.GetStatus?id=100";
 
-  let responseObject = fn_shelly_call(p_url);
-  if (responseObject === 0) {
-    return;
-  }
+// main function that is called periodically
+function process_main() {
+  const p_url_shellyplus1_battery_sensor = "http://192.168.33.7/rpc/Voltmeter.GetStatus?id=100";
 
-  print("Voltmeter object: ", JSON.stringify(responseObject));
+  fn_shelly_call(p_url_shellyplus1_battery_sensor);
+
+}
   
-}
 
 print(Date.now(), "Start Battery Voltage monitoring for LVDS ");
 
-pingTimer = Timer.set(CONFIG.pollingIntervalSeconds * 1000, true, get_battery_voltage);
+pingTimer = Timer.set(CONFIG.pollingIntervalSeconds * 1000, true, process_main);
 
 Shelly.addStatusHandler(function (status) {
   //is the component a switch
@@ -103,5 +119,5 @@ Shelly.addStatusHandler(function (status) {
   Timer.clear(pingTimer);
 
   // start the loop to ping the endpoints again
-  pingTimer = Timer.set(CONFIG.retryIntervalSeconds * 1000, true, get_battery_voltage);
+  pingTimer = Timer.set(CONFIG.retryIntervalSeconds * 1000, true, process_main);
 });
