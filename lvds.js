@@ -62,18 +62,19 @@ function process_main() {
         }
 
         // we have a valid measurement of the raw battery voltage at its terminals
-        print (Date.now(), "Raw Battery Voltage: ", batterVoltageRaw);
+        // print (Date.now(), "Raw Battery Voltage: ", batterVoltageRaw);
         Shelly.call("Input.GetStatus",{ id:100 },
           function(result, err_code, err_message) {
           if (err_code === 0) {
             const battery_current = result['xpercent'];
-            console.log("battery current", battery_current);
+            // console.log("battery current", battery_current);
 
             // Calculate the IR compensated Battery Voltage
             $batteryVoltageCompensated = batterVoltageRaw - (battery_current * CONFIG.rInt);
-            print('Raw Batt Voltage: ', batterVoltageRaw, ' Compensated Batt Voltage: ', $batteryVoltageCompensated);
+            print('VbatRaw: ', batterVoltageRaw, ' VbatComp: ', $batteryVoltageCompensated);
 
             // do something with the compensated battery voltage
+            // fn_lvds($batteryVoltageCompensated);
 
           } else {
               console.log("Error:", err_message);
