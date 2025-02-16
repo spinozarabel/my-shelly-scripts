@@ -33,71 +33,68 @@ let CONFIG = {
   // LVDS recovery voltage threshold
   lvdsRecoveryVoltage: 48.3,
   // polling interval in seconds
-  pollingIntervalSeconds: 20,
+  pollingIntervalSeconds: 30,
   // timeout for http call
   httpTimeout: 10,
+  // Battery Internal resistance in Ohms
+  rInt: 0.035,
+  // Shelly battery voltage device IP address
+  shellyBatteryVoltageUrl: "http://192.168.33.7/rpc/Voltmeter.GetStatus?id=100",
 };
 
 
+// Function to process the main logic
+function process_main() {
+  const shellyBatteryVoltageUrl = CONFIG.shellyBatteryVoltageUrl;
 
-// this is our polling timer
-let pollTimer = null;
-
-// generic function that reads a parameter with http get.
-// p_url: address of device to read
-function fn_shelly_call(p_url) {
   Shelly.call(
     "http.get",
-    { url: p_url, timeout: CONFIG.httpTimeout },
+    { url: shellyBatteryVoltageUrl, timeout: CONFIG.httpTimeout },
     function (response, error_code, error_message) {
-      if (error_code != 0) {
-        print("Failed to fetch, error(" + error_code + ") " + error_message + ' - url: ' + p_url);
-        return 0;
-      } else {
-        if (response === undefined || response === null) {
-          print("ERROR - response undefined or NULL");
-          return 0;
-        } else {
-            let responseData = JSON.parse(response.body);
-            let batterVoltageRaw = responseData.xvoltage;
-            if (batterVoltageRaw == undefined || batterVoltageRaw === null)  {
-              print("ERROR - response error code: " + responseData.error);
-              return;
-            }
-            // we have a valid measurement of the raw battery voltage at its terminals
-            print (Date.now(), "Raw Battery Voltage: ", batterVoltageRaw);
-
-            Shelly.call("Input.GetStatus",{ id:100 },
-              function(result, err_code, err_message, batterVoltageRaw) {
-                  if (err_code === 0) {
-                    const battery_current = result['xpercent'];
-                      console.log("battery current", battery_current);
-                      
-                  } else {
-                      console.log("Error:", err_message);
-                  }
-              }
-          );
-
-            
-            }
+      if (error_code === 0) {
+        // we have a valid response.
+        let responseData      = JSON.parse(response.body);
+        let batterVoltageRaw  = responseData.xvoltage;
+        if (batterVoltageRaw === undefined || batterVoltageRaw === null)  {
+          // Bad data, return
+          print("ERROR - voltage is undefined or NULL" );
+          return;
         }
-  });
+
+        // we have a valid measurement of the raw battery voltage at its terminals
+        print (Date.now(), "Raw Battery Voltage: ", batterVoltageRaw);
+        Shelly.call("Input.GetStatus",{ id:100 },
+          function(result, err_code, err_message) {
+          if (err_code === 0) {
+            const battery_current = result['xpercent'];
+            console.log("battery current", battery_current);
+
+            // Calculate the IR compensated Battery Voltage
+            $batteryVoltageCompensated = batterVoltageRaw - (battery_current * CONFIG.rInt);
+            print('Raw Batt Voltage: ', batterVoltageRaw, ' Compensated Batt Voltage: ', $batteryVoltageCompensated);
+
+            // do something with the compensated battery voltage
+
+          } else {
+              console.log("Error:", err_message);
+              return;
+          }
+        });
+      } else {
+          // we have errors in battery voltage measurement
+          print("Failed to fetch, error(" + error_code + ") " + error_message + ' - url: ' + shellyBatteryVoltageUrl);
+          return;
+        } 
+    });
 }
     
 
-
-// main function that is called periodically
-function process_main() {
-  const p_url_shellyplus1_battery_sensor = "http://192.168.33.7/rpc/Voltmeter.GetStatus?id=100";
-
-  fn_shelly_call(p_url_shellyplus1_battery_sensor);
-
-}
-  
+// Start the script
 
 print(Date.now(), "Start Battery Voltage monitoring for LVDS ");
 
+// Start the script by setting the timer. When the timer goes off, the process_main function is called.
+// The process_main function will then set the timer again.
 pingTimer = Timer.set(CONFIG.pollingIntervalSeconds * 1000, true, process_main);
 
 Shelly.addStatusHandler(function (status) {
@@ -119,5 +116,5 @@ Shelly.addStatusHandler(function (status) {
   Timer.clear(pingTimer);
 
   // start the loop to ping the endpoints again
-  pingTimer = Timer.set(CONFIG.retryIntervalSeconds * 1000, true, process_main);
+  pingTimer = Timer.set(CONFIG.pollingIntervalSeconds * 1000, true, process_main);
 });
