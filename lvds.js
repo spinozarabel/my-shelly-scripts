@@ -5,13 +5,11 @@
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-//
+
 // Shelly is a Trademark of Allterco Robotics
 
 // Shelly Script LVDS - Low Battery Voltage Disconnect for an Inverter - Battery system
-//
+// ver 2
 // This script monitors a shelly plus 1 device with an Addon that has an analog input.
 // This analog input is configured as a Voltmeter with a FS of 10V.
 // The voltage of the lithium battery is in the range of 46 - 54V.
