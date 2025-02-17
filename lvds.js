@@ -27,7 +27,7 @@ let CONFIG = {
   // number of minutes for the LVDS window
   lvdsTimerCount: 6, // count of 6 is an interval of 3 minutes as each count is one timer interval
   // LVDS Voltage threshold. If the battery voltage goes below this value LVDS is triggere
-  lvdsVoltage: 49.5,
+  lvdsVoltage: 49.6,
   // number of minutes for the LVDS recovery window.
   lvdsRecoveryTimerCOunt: 10,  // count of 10 is an interval of 5 minutes
   // LVDS recovery voltage threshold
@@ -105,7 +105,7 @@ function process_main() {
         }
 
         // we have a valid measurement of the raw battery voltage at its terminals
-        // print (Date.now(), "Raw Battery Voltage: ", batterVoltageRaw);
+        // So lets get a local measurement of the current flowing in the battery
         Shelly.call("Input.GetStatus",{ id:100 },
           function(result, err_code, err_message) {
           if (err_code === 0) {
@@ -116,8 +116,19 @@ function process_main() {
             // Calculate the IR compensated Battery Voltage
             // battery current is +ve when charging and -ve when discharging
             // Compensated battery voltage is higher while discharging and lower while charging
-            $batteryVoltageCompensated = batterVoltageRaw - (battery_current * CONFIG.rInt);
-            print('VbatRaw: ', batterVoltageRaw, ' VbatComp: ', $batteryVoltageCompensated);
+            // However, sometimes the old battery voltage reading is given even though
+            // it has gone past FS due to charging.
+            // So we need to check if the battery current is charging or discharging
+            const batteryIsCharging = battery_current >= 0 ? true : false;
+            const batteryIsDischarging = battery_current < 0 ? true : false;
+            if (batteryIsCharging) {
+              // battery is charging and likely there is no danger of LVDS
+              $batteryVoltageCompensated = batterVoltageRaw;
+            } else if (batteryIsDischarging) {
+              $batteryVoltageCompensated = batterVoltageRaw - (battery_current * CONFIG.rInt);
+            }
+            
+            print('VbatRaw: ', batterVoltageRaw, ' VbatComp: ', $batteryVoltageCompensated, ' Ibat: ', battery_current);
 
             // do something with the compensated battery voltage
             fn_lvds($batteryVoltageCompensated);
