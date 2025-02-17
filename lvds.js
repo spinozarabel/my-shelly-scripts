@@ -9,7 +9,7 @@
 // Shelly is a Trademark of Allterco Robotics
 
 // Shelly Script LVDS - Low Battery Voltage Disconnect for an Inverter - Battery system
-// ver 2
+// ver 2 17 Feb 2025
 // This script monitors a shelly plus 1 device with an Addon that has an analog input.
 // This analog input is configured as a Voltmeter with a FS of 10V.
 // The voltage of the lithium battery is in the range of 46 - 54V.
