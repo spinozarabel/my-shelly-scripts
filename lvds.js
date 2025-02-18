@@ -23,11 +23,11 @@
 //
 let CONFIG = {
   // number of minutes for the LVDS window
-  lvdsTimerCount: 6, // count of 6 is an interval of 3 minutes as each count is one timer interval
+  lvdsTimerCount: 3, // count of 3 is an interval of 1.5 minutes as each count is 30s
   // LVDS Voltage threshold. If the battery voltage goes below this value LVDS is triggere
-  lvdsVoltage: 49.6,
+  lvdsVoltage: 49.5,
   // number of minutes for the LVDS recovery window.
-  lvdsRecoveryTimerCOunt: 10,  // count of 10 is an interval of 5 minutes
+  lvdsRecoveryTimerCOunt: 6,  // count of 6 is an interval of 3 minutes
   // LVDS recovery voltage threshold
   lvdsRecoveryVoltage: 49.8,
   // polling interval in seconds
