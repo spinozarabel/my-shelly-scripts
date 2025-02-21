@@ -48,6 +48,7 @@ let CONFIG = {
 function fn_lvds(batteryVoltage, batteryCurrent, batteryIsDischarging) {
  
   switch (true) {
+    // LVDS
     case (batteryVoltage < CONFIG.lvdsVoltage && batteryVoltage > 40 && batteryIsDischarging):
       // LVDS onset - need to sustain over the required interval
       lvdsTimerCounter++;
@@ -96,11 +97,12 @@ function fn_lvds(batteryVoltage, batteryCurrent, batteryIsDischarging) {
       }
       break;
 
+    // not LVDS and not LVDS release so reset the counters
     default:
-      // not LVDS and not LVDS release so reset the counters
       lvdsTimerCounter = 0;
       lvdsRecoveryTimerCounter = 0;
       break;
+
   } // end of switch
 }   // end of function fn_lvds
 
@@ -110,6 +112,8 @@ function fn_lvds(batteryVoltage, batteryCurrent, batteryIsDischarging) {
 function process_main() {
   const shellyBatteryVoltageUrl = CONFIG.shellyBatteryVoltageUrl;
 
+  // measure the battery voltage using the shellyplus1 with addon
+  // an error in measurement usually implies that reading os out of range so > 50V
   Shelly.call(
     "http.get",
     { url: shellyBatteryVoltageUrl, timeout: CONFIG.httpTimeout },
@@ -184,6 +188,7 @@ print(Date.now(), "Start Battery Voltage monitoring for LVDS ");
 // The process_main function will then set the timer again.
 pingTimer = Timer.set(CONFIG.pollingIntervalSeconds * 1000, true, process_main);
 
+// timer based event handler
 Shelly.addStatusHandler(function (status) {
   //is the component a switch
   if(status.name !== "switch") return;
