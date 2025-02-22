@@ -23,13 +23,13 @@
 //
 let CONFIG = {
   // number of minutes for the LVDS window
-  lvdsTimerCount: 3, // count of 3 is an interval of 1.5 minutes as each count is 30s
+  lvdsTimerCount: 6, // count of 3 is an interval of 1.5 minutes as each count is 30s
   // LVDS Voltage threshold. If the battery voltage goes below this value LVDS is triggere
-  lvdsVoltage: 49.5,
+  lvdsVoltage: 49.0,
   // number of minutes for the LVDS recovery window.
   lvdsRecoveryTimerCOunt: 6,  // count of 6 is an interval of 3 minutes
   // LVDS recovery voltage threshold
-  lvdsRecoveryVoltage: 49.7,
+  lvdsRecoveryVoltage: 49.3,
   // polling interval in seconds
   pollingIntervalSeconds: 30,
   // timeout for http call
@@ -44,55 +44,67 @@ let CONFIG = {
   shellyOutputOffUrl:       "http://192.168.33.7/rpc/Switch.Set?id=0&on=false",
 };
 
-// Function to control the LVDS onset and release
-function fn_lvds(batteryVoltage, batteryCurrent, batteryIsDischarging) {
+// Go ON-GRID by switching Remote Entry to Closed Inactive to not prohibit the Transfer Relay
+function fn_turnGridOn(response, error_code, error_message) {
+  if (error_code === 0) {
+            
+    lvdsTriggered = true;
+    lvdsReleased  = false;
+    // print(Date.now(), "LVDS Triggered - Battery Voltage: ", batteryVoltage);
+    // reset the lvds counter
+    lvdsTimerCounter = 0;
+  }
+}
+
+// Go OFF-GRID by switching Remote Entry to Open Active to prohibit the Transfer Relay
+function fn_turnGridOff(response, error_code, error_message) {
+  if (error_code === 0) {
+              
+    lvdsTriggered = false;
+    lvdsReleased  = true;
+    // print(Date.now(), "LVDS Released - Battery Voltage: ", batteryVoltage);
+    // Reset the counters
+    lvdsTimerCounter = 0;
+    lvdsRecoveryTimerCounter = 0;
+  }
+}
+
+// monitor for conditions for LVDS onset and release
+function fn_lvds() {
  
   switch (true) {
     // LVDS
-    case (batteryVoltage < CONFIG.lvdsVoltage && batteryVoltage > 40 && batteryIsDischarging):
+    case (lvdsTriggered === false             &&
+          batteryVoltage < CONFIG.lvdsVoltage && 
+          batteryVoltage > 40                 && 
+          batteryIsDischarging):
       // LVDS onset - need to sustain over the required interval
       lvdsTimerCounter++;
-      print(Date.now(), "LVDS counter incremented to: ", lvdsTimerCounter);
+
+      // print(Date.now(), "LVDS counter incremented to: ", lvdsTimerCounter);
+
       if (lvdsTimerCounter >= CONFIG.lvdsTimerCount) {
         // Turn on the output switch of the ShellyPlus 1 of the Battery Voltage Sensor
-        Shelly.call("http.get",
-          { url: CONFIG.shellyOutputOnUrl, timeout: CONFIG.httpTimeout },
-          function (response, error_code, error_message) {
-          if (error_code === 0) {
-            
-            lvdsTriggered = true;
-            lvdsReleased  = false;
-            print(Date.now(), "LVDS Triggered - Battery Voltage: ", batteryVoltage);
-            // reset the lvds counters
-            lvdsTimerCounter = 0;
 
-          }
-        }); // end of the Shelly.call function
+        Shelly.call("http.get",
+                    { url: CONFIG.shellyOutputOnUrl, timeout: CONFIG.httpTimeout },
+                    fn_turnGridOn
+                  );
       }
       break;
     
     // LVDS release
-    case (batteryVoltage > CONFIG.lvdsRecoveryVoltage && lvdsReleased === false && ! batteryIsDischarging):
+    case (batteryVoltage > CONFIG.lvdsRecoveryVoltage && 
+          lvdsReleased === false                      && 
+          ! batteryIsDischarging):
       // LVDS release onset - need to sustain over the required interval
       lvdsRecoveryTimerCounter++;
       print(Date.now(), "LVDS release counter incremented to: ", lvdsRecoveryTimerCounter);
       if (lvdsRecoveryTimerCounter >= CONFIG.lvdsRecoveryTimerCOunt) {
         // Turn off the output switch
         Shelly.call("http.get",
-          { url: CONFIG.shellyOutputOffUrl, timeout: CONFIG.httpTimeout },
-          function (response, error_code, error_message) {
-            if (error_code === 0) {
-              
-              lvdsTriggered = false;
-              lvdsReleased  = true;
-
-              print(Date.now(), "LVDS Released - Battery Voltage: ", batteryVoltage);
-
-              // Reset the counters
-              lvdsTimerCounter = 0;
-              lvdsRecoveryTimerCounter = 0;
-            }
-          }
+                    { url: CONFIG.shellyOutputOffUrl, timeout: CONFIG.httpTimeout }, 
+                    fn_turnGridOff
         );
       }
       break;
@@ -121,13 +133,13 @@ function process_main() {
       if (error_code === 0) {
         // we have a valid response.
         let responseData      = JSON.parse(response.body);
+
+        // local variable to hold the battery voltage
         let batterVoltageRaw  = responseData.xvoltage;
+
         if (batterVoltageRaw === undefined || batterVoltageRaw === null)  {
-          // Bad data, return after restting the lvds counters
-          lvdsTimerCounter = 0;
-          lvdsRecoveryTimerCounter = 0;
-          print("ERROR - voltage is undefined or NULL" );
-          return;
+          // Most probably voltmeter over ranged, set voltage to 50
+          batterVoltageRaw = 50;
         }
 
         // we have a valid measurement of the raw battery voltage at its terminals
@@ -136,8 +148,8 @@ function process_main() {
           function(result, err_code, err_message) {
           if (err_code === 0) {
             // we have a valid current measurement
-            const battery_current = result['xpercent'];
-            // console.log("battery current", battery_current);
+            batteryCurrent = result['xpercent'];
+            // console.log("battery current", batteryCurrent);
 
             // Calculate the IR compensated Battery Voltage
             // battery current is +ve when charging and -ve when discharging
@@ -145,20 +157,20 @@ function process_main() {
             // However, sometimes the old battery voltage reading is given even though
             // it has gone past FS due to charging.
             // So we need to check if the battery current is charging or discharging
-            const batteryIsCharging     = battery_current >= 0  ? true : false;
-            const batteryIsDischarging  = battery_current < 0   ? true : false;
+            const batteryIsCharging     = batteryCurrent >= 0  ? true : false;
+            const batteryIsDischarging  = batteryCurrent < 0   ? true : false;
             if (batteryIsCharging) {
               // battery is charging and likely there is no danger of LVDS
-              $batteryVoltageCompensated = batterVoltageRaw;
+              batteryVoltage = batterVoltageRaw;
             } else if (batteryIsDischarging) {
               // battery is discharging and there is a danger of LVDS
-              $batteryVoltageCompensated = batterVoltageRaw - (battery_current * CONFIG.rInt);
+              batteryVoltage = batterVoltageRaw - (batteryCurrent * CONFIG.rInt);
             }
             
-            print('VbatRaw: ', batterVoltageRaw, ' VbatComp: ', $batteryVoltageCompensated, ' Ibat: ', battery_current);
+            print('VbatRaw: ', batterVoltageRaw, ' VbatComp: ', batteryVoltage, ' Ibat: ', batteryCurrent);
 
-            // do something with the compensated battery voltage
-            fn_lvds($batteryVoltageCompensated, battery_current, batteryIsDischarging);
+            // Monitor for LVDS or its release
+            fn_lvds();
 
           } else {
               console.log("Error:", err_message);
@@ -166,7 +178,7 @@ function process_main() {
           }
         });
       } else {
-          // we have errors in battery voltage measurement
+          // error code is not 0, we have errors in battery voltage measurement
           print("Failed to fetch, error(" + error_code + ") " + error_message + ' - url: ' + shellyBatteryVoltageUrl);
           return;
         } 
@@ -175,12 +187,16 @@ function process_main() {
     
 
 // Start the script
-// set the lvds timer counters to 0. These are global variables
+// These are global variables
 let lvdsTimerCounter          = 0;
 let lvdsRecoveryTimerCounter  = 0;
 let lvdsTriggered             = false;
 let lvdsReleased              = false;
 let pingTimer                 = null;
+let batteryVoltage            = 0;
+let batteryCurrent            = 0;
+let batteryIsCharging         = false;
+let batteryIsDischarging      = false;
 
 print(Date.now(), "Start Battery Voltage monitoring for LVDS ");
 
