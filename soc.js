@@ -39,6 +39,8 @@ let CONFIG = {
   shellyOutputOnUrl:        "http://192.168.33.7/rpc/Switch.Set?id=0&on=true",
   // URL to turnoff the output switch of the ShellyPlus 1 of the Battery Voltage Sensor
   shellyOutputOffUrl:       "http://192.168.33.7/rpc/Switch.Set?id=0&on=false",
+  // 
+  shellySocNumberSetUrl:    "http://192.168.87.120/rpc/Number.Set?id=200&value=",
 };
 
 function process_main(status) {
@@ -93,6 +95,14 @@ function process_main(status) {
       fn_turnGridOff
     );
   }
+
+  let shellySocNumberSetUrl = CONFIG.shellySocNumberSetUrl + Math.round(socPercentNow * 100) / 100;
+  
+  // write the soc value to virtual component of Shelly Grid PRO 3EM device
+  // Setting values of virtual components is only async operation
+  //Shelly.call("http.get", { url: shellySocNumberSetUrl, timeout: CONFIG.httpTimeout }, function(result) {
+    // do something here if you wish
+  //});
 }
 
 
@@ -132,8 +142,7 @@ let batteryCurrentNow         = 0;
 let batteryCurrentAvg         = 0;
 let deltaChargeAh             = 0;
 let deltaSocPercent           = 0;
-let socPercentNow             = 100;
-let socPercentStart           = 100;
+let socPercentNow             = 84;     // SOC value at beginning of script
 let lvdsTriggered             = false;
 let lvdsReleased              = false;
 
