@@ -9,7 +9,7 @@
 // Shelly is a Trademark of Allterco Robotics
 
 // Shelly Script LVDS - Low Battery Voltage Disconnect for an Inverter - Battery system
-// ver 2 27 Feb 2025
+// ver 3 28 Feb 2025
 // This script monitors a shelly plus 1 device with an Addon that has an analog input.
 // This analog input is configured as a Voltmeter with a FS of 10V.
 // The voltage of the lithium battery is in the range of 46 - 54V.
@@ -47,7 +47,7 @@ function process_main(status) {
   // get the battery current
   batteryCurrentNow = status.delta.xpercent;
 
-  // if absolute value of the battery current is less than 0.1, then set it to 0
+  // if absolute value of the battery current is less than 1.6A, then set it to 0
   if (Math.abs(batteryCurrentNow) < 1.6) {
     batteryCurrentNow = 0;
   }
@@ -55,17 +55,24 @@ function process_main(status) {
   // get the current timestep in seconds
   ts_now_secs = Math.floor(Date.now() / 1000);
 
+  deltaSeconds = ts_now_secs - ts_past_secs;
+
+  // script updates less than this may cause too many calls in process error due to async nature
+  if (deltaSeconds <  10) {
+    return;
+  }
+
   // calculate the average current
   batteryCurrentAvg = (batteryCurrentPast + batteryCurrentNow) * 0.5;
 
   // calculate the delta charge in Ah
-  deltaChargeAh = (batteryCurrentAvg * (ts_now_secs - ts_past_secs)) / 3600;
+  deltaChargeAh = (batteryCurrentAvg * deltaSeconds) / 3600;
 
   // calculate the delta soc in percent
-  deltaSocPercent = (deltaChargeAh * 100) / 300;  // battery capacity is 300Ah
+  deltaSocPercent = (deltaChargeAh / 300) * 100;  // battery capacity is 300Ah
 
-  // calculate the soc in percent
-  socPercentNow = socPercentNow + deltaSocPercent;
+  // Update the soc in percent as an accumulation
+  socPercentNow += deltaSocPercent;
 
   // clamp to 100
   if (socPercentNow > 100) {
@@ -75,8 +82,8 @@ function process_main(status) {
   print("Battery Current: ", batteryCurrentNow, " SOC: ", Math.round(socPercentNow * 10) / 10);
 
   // move present to past
-  batteryCurrentPast = batteryCurrentNow;
-  ts_past_secs = ts_now_secs;
+  batteryCurrentPast  = batteryCurrentNow;
+  ts_past_secs        = ts_now_secs;
 
   // if the SOC is less than 60% then turn on the output switch
   if (lvdsTriggered === false &&  socPercentNow < CONFIG.lvdsSoc) {
@@ -87,7 +94,7 @@ function process_main(status) {
     );
   }
 
-  // if the SOC is greater than 61% then turn off the output switch
+  // if the SOC is greater than 62% then turn off the output switch
   if (lvdsReleased === false &&  socPercentNow > CONFIG.lvdsSocRecovery) {
     // turn off the output switch
     Shelly.call("http.get",
@@ -96,13 +103,13 @@ function process_main(status) {
     );
   }
 
-  let shellySocNumberSetUrl = CONFIG.shellySocNumberSetUrl + Math.round(socPercentNow * 100) / 100;
-  
   // write the soc value to virtual component of Shelly Grid PRO 3EM device
   // Setting values of virtual components is only async operation
-  //Shelly.call("http.get", { url: shellySocNumberSetUrl, timeout: CONFIG.httpTimeout }, function(result) {
+  let shellySocNumberSetUrl = CONFIG.shellySocNumberSetUrl + Math.round(socPercentNow * 100) / 100;
+  
+  Shelly.call("http.get", { url: shellySocNumberSetUrl, timeout: CONFIG.httpTimeout }, function(result) {
     // do something here if you wish
-  //});
+  });
 }
 
 
@@ -142,7 +149,7 @@ let batteryCurrentNow         = 0;
 let batteryCurrentAvg         = 0;
 let deltaChargeAh             = 0;
 let deltaSocPercent           = 0;
-let socPercentNow             = 84;     // SOC value at beginning of script
+let socPercentNow             = 100;     // SOC value at beginning of script
 let lvdsTriggered             = false;
 let lvdsReleased              = false;
 
