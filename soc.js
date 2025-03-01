@@ -11,15 +11,12 @@
 // Shelly Script LVDS - Low Battery Voltage Disconnect for an Inverter - Battery system
 // ver 3 28 Feb 2025
 // This script monitors a shelly plus 1 device with an Addon that has an analog input.
-// This analog input is configured as a Voltmeter with a FS of 10V.
-// The voltage of the lithium battery is in the range of 46 - 54V.
-// A divide by 5 is used to bring this down for our 0-10V range.
-// Another Shelly plus 1 with an add on measures the battery current
+// This analog input is configured as an ammeter with a FS of 100% corresponding to 10V.
+// xpercent calculated value is configured to be the battery current in Amps.
 // using a Hall effect sensor and an opamp with a gain of 4.7.
-// The battery voltage is periodically sampled and so is the battery current of the other device.
-// The battery voltage is calculated including an assumed IR drop.
-// When the voltage goes below a set limit for more than the set time, the output switch is closed.
-// WHen the voltage crosses a set recovery voltage for more than a set time, the output switch is released.
+// The battery current is monitored and the accumulated SOC is calculated for a 300AH battery system.
+// If the SOC goes below 60% the output switch of the ShellyPlus 1 is turned on.
+// If the SOC goes above 62% the output switch of the ShellyPlus 1 is turned off.
 //
 let CONFIG = {
 
@@ -79,7 +76,7 @@ function process_main(status) {
     socPercentNow = 100;
   }
 
-  print("Battery Current: ", batteryCurrentNow, " SOC: ", Math.round(socPercentNow * 10) / 10);
+  print("Battery Current: ", batteryCurrentAvg, "deltaSecs=", deltaSeconds, " SOC: ", Math.round(socPercentNow * 10) / 10);
 
   // move present to past
   batteryCurrentPast  = batteryCurrentNow;
